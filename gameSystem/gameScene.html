@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf8">
+        <title>Catan</title>
+        <style>
+            #contents-catanIsland{
+                position: relative;
+                top: 0px;
+                left: 0px;
+                width: 1200px;
+                height: 620px;
+                background-color: skyblue;
+            }
+        </style>
+    </head>
+    <body>
+
+        <div id="contents-catanIsland"> </div>
+
+        <script>
+            // ２次元座標
+            class Vec2
+            {
+                constructor(x, y)
+                {
+                    this.x = x;
+                    this.y = y;
+                }
+
+                vecLength()
+                {
+                    return Math.sqrt(this.x * this.x + this.y * this.y);
+                }
+
+                dist(other)
+                {
+                    let tempVec = new Vec2(this.x - other.x, this.y - other.y);
+                    return tempVec.vecLength();
+                }
+            }
+
+            // カタン島の要素
+            class CatanObject
+            {
+                constructor(pos, type, index, object)
+                {
+                    this.pos = pos;
+                    this.type = type;
+                    this.index = index;
+                    this.object = object;
+                }
+            }
+
+            // プレイヤー情報
+            class PlayerData
+            {
+                constructor(woodCounter, stoneCounter, wheatCounter, sheepCounter, ironCounter)
+                {
+                    this.woodCounter = woodCounter;
+                    this.stoneCounter = stoneCounter;
+                    this.wheatCounter = wheatCounter;
+                    this.sheepCounter = sheepCounter;
+                    this.ironCounter = ironCounter;
+                }
+            }
+
+            // カタン島の要素の大きさ
+            var catanIslandMargin = new Vec2(128, 128);
+            var tileSize = new Vec2(128, 128);
+            var cornerSize = new Vec2(24, 24);
+            var sideSize = new Vec2(48, 12);
+
+            // カタン島の要素
+            var tileImageArray = [];
+            var tileDiceValueArray = [];
+            var cornerImageArray = [];
+            var sideImageArray = [];
+            
+            // プレイヤー情報
+            var playerDataArray = [];
+
+            // カタン島の要素が存在する座標
+            var catanObjectArray = [];
+
+            // 画面を更新する頻度を管理するタイマー
+            var updateTimer = 0;
+
+            // ポストを使って通信するための関数
+            function postData(url = ``, data = {})
+            {
+                return fetch(url, { 
+                    method: "POST", 
+                    headers: {"Content-type" : "application/json; charset=utf-8" },
+                    body: JSON.stringify(data) })
+                .then(response => response.json());
+            }
+
+            // join exolode
+
+            // カタン島を更新する
+            function updateCatanIsland(tileData, cornerData, sideData, playerData)
+            {
+                for(var i=0; i < tileImageArray.length; i++)
+                {
+                    switch (tileData[i][0])
+                    {
+                    case '0':
+                        catanObjectArray[i].object.src = '../asset/image/CatanTileDesert.png';
+                        break;
+                    case '1':
+                        catanObjectArray[i].object.src = '../asset/image/CatanTileWood.png';
+                        break;
+                    case '2':
+                        catanObjectArray[i].object.src = '../asset/image/CatanTileStone.png';
+                        break;
+                    case '3':
+                        catanObjectArray[i].object.src = '../asset/image/CatanTileWheat.png';
+                        break;
+                    case '4':
+                        catanObjectArray[i].object.src = '../asset/image/CatanTileSheep.png';
+                        break;
+                    case '5':
+                        catanObjectArray[i].object.src = '../asset/image/CatanTileIron.png';
+                        break;
+                    }
+                }
+
+                console.log(tileData);
+
+                //tileData[0][0] = '1';
+                postData(`/catan/api/updateParam.php`, {inTileData: tileData, inCornerData: cornerData, inSideData: sideData, inPlayerData: playerData})
+                .then(updateTimer = 0);
+            }
+
+            // 画面情報の更新
+            function update()
+            {
+                if (updateTimer++ == 60)
+                {
+                    console.log("update start");
+
+                    fetch("/catan/api/test.php") 
+                    .then( (res)=>{ 
+                        return res.json();
+                    }) 
+                    .then( (json)=>{
+
+                        var tileData = json["tileData"];
+                        var cornerData = json["cornerData"];
+                        var sideData = json["sideData"];
+                        var playerData = json["playerData"];
+
+                        updateCatanIsland(tileData, cornerData, sideData, playerData);
+                    });
+                }
+                window.requestAnimationFrame(update);
+            }
+
+            // 画面クリックの検知
+            document.getElementById('contents-catanIsland').addEventListener("click", function(e)
+            {
+                var clickPos = new Vec2(e.pageX, e.pageY);
+
+                if (clickPos.x > 770) return;
+
+                var hitObject = catanObjectArray[0];
+
+                for(var i=1; i < catanObjectArray.length; i++)
+                {
+                    if (clickPos.dist(catanObjectArray[i].pos) < clickPos.dist(hitObject.pos))
+                    {
+                        hitObject = catanObjectArray[i];
+                    }
+                } console.log(hitObject.object.id);
+            });
+
+            // タイルの配置
+            var tileSizeArray = [3, 4, 5, 4, 3];
+            var tileXPosOffsetArray = [
+                    tileSize.x,
+                    tileSize.x * 0.5,
+                    0,
+                    tileSize.x * 0.5,
+                    tileSize.x
+                ];
+            var index = 0;
+            for(var y=0; y < tileSizeArray.length; y++)
+            {
+                for(var x=0; x < tileSizeArray[y]; x++)
+                {
+                    let posX = catanIslandMargin.x + tileXPosOffsetArray[y] + (x * tileSize.x);
+                    let posY = catanIslandMargin.y + (y * (tileSize.y * 0.75));
+
+                    let tile = document.createElement('img');
+                    tile.id = "catanTile_" + index;
+                    tile.src = '../asset/image/CatanTileBase.png';
+                    tile.style.position = "absolute";
+                    tile.style.top = posY - (tileSize.y * 0.5) + "px";
+                    tile.style.left = posX - (tileSize.x * 0.5) + "px";
+                    document.getElementById('contents-catanIsland').appendChild(tile);
+                    tileImageArray.push(tile);
+
+                    catanObjectArray.push(new CatanObject(
+                        new Vec2(posX, posY),
+                        1,
+                        index,
+                        tile
+                    ));
+                    ++index;
+                }
+            }
+
+            // タイルごとのサイコロの出目の値
+            var index = 0;
+            for(var y=0; y < tileSizeArray.length; y++)
+            {
+                for(var x=0; x < tileSizeArray[y]; x++)
+                {
+                    let posX = catanIslandMargin.x + tileXPosOffsetArray[y] + (x * tileSize.x);
+                    let posY = catanIslandMargin.y + (y * (tileSize.y * 0.75));
+
+                    let tileDiceValue = document.createElement('div');
+                    tileDiceValue.id = "tileDiceValue_" + index;
+                    tileDiceValue.innerHTML = "0";
+                    tileDiceValue.style.position = "absolute";
+                    tileDiceValue.style.top = posY + "px";
+                    tileDiceValue.style.left = posX + "px";
+                    document.getElementById('contents-catanIsland').appendChild(tileDiceValue);
+                    tileDiceValueArray.push(tileDiceValue);
+                    ++index;
+                }
+            }
+
+            // 角の配置
+            var cornerSizeArray = [7, 9, 11, 11, 9, 7];
+            var cornerXPosOffsetArray = [
+                    (tileSize.x * 0.5),
+                    0,
+                    -(tileSize.x * 0.5),
+                    -(tileSize.x * 0.5),
+                    0,
+                    (tileSize.x * 0.5)
+                ];
+            var index = 0;
+            for(var y=0; y < cornerSizeArray.length; y++)
+            {
+                for(var x=0; x < cornerSizeArray[y]; x++)
+                {
+                    let posX = catanIslandMargin.x + cornerXPosOffsetArray[y] + (x * (tileSize.x / 2));
+                    if (y < 3)  var posY = catanIslandMargin.y - (tileSize.y * 0.5) + (y * (tileSize.y * 0.75) + (tileSize.y * 0.25) * ((x + 1) % 2));
+                    else        var posY = catanIslandMargin.y - (tileSize.y * 0.5) + (y * (tileSize.y * 0.75) + (tileSize.y * 0.25) * (x % 2));
+
+                    let corner = document.createElement('img');
+                    corner.id = "corner_" + index;
+                    corner.style.position = "absolute";
+                    corner.style.top = posY - (cornerSize.y * 0.5) + "px";
+                    corner.style.left = posX - (cornerSize.x * 0.5) + "px";
+                    document.getElementById('contents-catanIsland').appendChild(corner);
+                    cornerImageArray.push(corner);
+
+                    catanObjectArray.push(new CatanObject(
+                        new Vec2(posX, posY),
+                        1,
+                        index,
+                        corner
+                    ));
+                    ++index;
+                }
+            }
+
+            // 辺の配置
+            var sideSizeArray = [6, 4, 8, 5, 10, 6, 10, 5, 8, 4, 6];
+            var sideXPosOffsetArray = [
+                (tileSize.x * 0.75),
+                (tileSize.x * 0.5), 
+                (tileSize.x * 0.25),
+                0, 
+                -(tileSize.x * 0.25),
+                -(tileSize.x * 0.5), 
+                -(tileSize.x * 0.25),
+                0, 
+                (tileSize.x * 0.25),
+                (tileSize.x * 0.5), 
+                (tileSize.x * 0.75)
+            ];
+            var index = 0;
+            for(var y=0; y < sideSizeArray.length; y++)
+            {
+                for(var x=0; x < sideSizeArray[y]; x++)
+                {
+                    let posY = catanIslandMargin.y - (tileSize.y * 0.37) + (y * (tileSize.y * 0.373));
+                    if (y % 2 == 0)
+                    {                    
+                        var posX = catanIslandMargin.x + sideXPosOffsetArray[y] + (x * (tileSize.x * 0.5));
+                        if (y < 6)  var rotate = 30 - (60 * ((x + 1) % 2));
+                        else        var rotate = 30 - (60 * (x % 2));
+                    }
+                    else
+                    {
+                        var posX = catanIslandMargin.x + sideXPosOffsetArray[y] + (x * tileSize.x);
+                        var rotate = 90;
+                    }
+
+                    let side = document.createElement('img');
+                    side.id = "side_" + index;
+                    side.style.position = "absolute";
+                    side.style.top = posY - (sideSize.y * 0.5) + "px";
+                    side.style.left = posX - (sideSize.x * 0.5) + "px";
+                    side.style.transform = "rotate(" + rotate + "deg)";
+                    document.getElementById('contents-catanIsland').appendChild(side);
+                    sideImageArray.push(side);
+
+                    catanObjectArray.push(new CatanObject(
+                        new Vec2(posX, posY),
+                        1,
+                        index,
+                        side
+                    ));
+                    ++index;
+                }
+            }
+            // プレイヤー情報の配置
+            for(var i=0; i < 4; i++)
+            {
+                let woodCounter = document.createElement('div');
+                woodCounter.id = "player_" + index + "_woodCounter";
+                woodCounter.innerHTML = "木材：0個";
+                woodCounter.style.position = "absolute";
+                woodCounter.style.top = 50 + (i * 150) + "px";
+                woodCounter.style.left = 800 + "px";
+                document.getElementById('contents-catanIsland').appendChild(woodCounter);
+
+                let stoneCounter = document.createElement('div');
+                stoneCounter.id = "player_" + index + "_stoneCounter";
+                stoneCounter.innerHTML = "石材：0個";
+                stoneCounter.style.position = "absolute";
+                stoneCounter.style.top = 50 + (i * 150) + "px";
+                stoneCounter.style.left = 900 + "px";
+                document.getElementById('contents-catanIsland').appendChild(stoneCounter);
+
+                let wheatCounter = document.createElement('div');
+                wheatCounter.id = "player_" + index + "_wheatCounter";
+                wheatCounter.innerHTML = "麦　：0個";
+                wheatCounter.style.position = "absolute";
+                wheatCounter.style.top = 80 + (i * 150) + "px";
+                wheatCounter.style.left = 800 + "px";
+                document.getElementById('contents-catanIsland').appendChild(wheatCounter);
+
+                let sheepCounter = document.createElement('div');
+                sheepCounter.id = "player_" + index + "_sheepCounter";
+                sheepCounter.innerHTML = "羊　：0個";
+                sheepCounter.style.position = "absolute";
+                sheepCounter.style.top = 80 + (i * 150) + "px";
+                sheepCounter.style.left = 900 + "px";
+                document.getElementById('contents-catanIsland').appendChild(sheepCounter);
+
+                let ironCounter = document.createElement('div');
+                ironCounter.id = "player_" + index + "_ironCounter";
+                ironCounter.innerHTML = "鉄鉱石：0個";
+                ironCounter.style.position = "absolute";
+                ironCounter.style.top = 110 + (i * 150) + "px";
+                ironCounter.style.left = 800 + "px";
+                document.getElementById('contents-catanIsland').appendChild(ironCounter);
+
+                let playerData = new PlayerData(woodCounter, stoneCounter, wheatCounter, sheepCounter, ironCounter);
+                playerDataArray.push(playerData);
+            }
+
+            update();
+
+        </script>
+
+    </body>
+</html>

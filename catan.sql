@@ -8,6 +8,18 @@
 CREATE DATABASE IF NOT EXISTS catan_db;
 USE catan_db;
 
+CREATE TABLE IF NOT EXISTS gameData(
+	`gameData_id`		integer,	/* ゲームデータID */
+	`gameState`    		integer, 	/* 現在のゲームの状態 */
+	`joinPlayerNum`    	integer,	/* ゲームの参加人数 */
+	`curTrunNum`    	integer,	/* 現在のターンプレイヤー */
+	`diceNum_1`    		integer,	/* 直前に出たサイコロの目（1個目） */
+	`diceNum_2`    		integer		/* 直前に出たサイコロの目（2個目） */
+)
+ENGINE=InnoDB   		/* MySQLのエンジンを指定 */
+CHARSET=utf8;   		/* 文字コード */
+TRUNCATE TABLE gameData;	/* テーブルを初期化 */
+
 /*----------------------------*/
 /* テーブルを作成             */
 /*----------------------------*/
